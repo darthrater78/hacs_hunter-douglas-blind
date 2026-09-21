@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.2.1] - 2026-09-21
+
+### Changed
+- A failed GATT connect now logs one WARNING per shade with the underlying error, the proxy's
+  device details, RSSI and whether a connectable advert was seen, so the cause is visible
+  without debug logging.
+- The Refresh battery error includes the underlying error text, and connect attempts are
+  capped at 3 so a press fails in seconds instead of after ~10 retries.
+
 ## [0.2.0] - 2026-09-21
 
 ### Added
