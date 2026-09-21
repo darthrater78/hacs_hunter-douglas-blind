@@ -1,0 +1,16 @@
+# Test-only. Not installed by Home Assistant or HACS.
+# pytest-homeassistant-custom-component pins the matching homeassistant core
+# (needs Python >= 3.14).
+pytest-homeassistant-custom-component==0.13.366
+
+# Home Assistant's bluetooth integration requirements (from its manifest.json
+# at the pinned core version); the core wheel does not install them.
+aiousbwatcher==1.1.2
+bleak==3.0.2
+bleak-retry-connector==4.7.0
+bluetooth-adapters==2.4.0
+bluetooth-auto-recovery==1.6.4
+bluetooth-data-tools==1.29.24
+dbus-fast==5.0.22
+habluetooth==6.26.11
+serialx==1.10.0

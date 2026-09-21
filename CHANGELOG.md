@@ -3,6 +3,7 @@
 ## [0.1.0] - Unreleased
 
 ### Added
+- Home Assistant tests (config flow, entity creation, live updates, GATT battery/device-info, spoof cap) and `requirements_test.txt`; CI now runs pytest on Python 3.14.
 - Sensors for all unencrypted data: position, secondary, tilt, battery, type, capability, status byte, RSSI, raw advertisement; device info on the device page.
 - Manual (scan-based) and Bluetooth-discovery config flows.
 - Initial HACS scaffold: Bluetooth-discovered config flow (one entry per PowerView home),

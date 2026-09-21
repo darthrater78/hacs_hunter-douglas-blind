@@ -9,3 +9,11 @@ updates:
       actions:
         patterns:
           - "*"
+
+  # Test tooling. pytest-homeassistant-custom-component moves with Home
+  # Assistant core; the bluetooth pins below it must move with the same release
+  # (see requirements_test.txt), so review those together.
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"

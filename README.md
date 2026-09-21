@@ -34,10 +34,14 @@ HACS → Custom repositories → add this repo as an *Integration*, then restart
 ## Development
 
 ```
-python3 -m unittest discover tests -v
+python3.14 -m venv .venv && . .venv/bin/activate
+pip install -r requirements_test.txt
+pytest
 ```
 
-The `protocol` package has no Home Assistant imports so it tests without an HA install.
+The `protocol` tests (`tests/test_protocol.py`) are plain `unittest` and need no Home Assistant
+install; `tests/test_hass.py` runs the config flow and sensors under pytest (Python 3.14, as the
+current Home Assistant core requires).
 CI runs HACS validation, hassfest and the tests. Releases: bump `manifest.json` version and
 `CHANGELOG.md`, merge, then tag `vX.Y.Z` on the default branch.
 
