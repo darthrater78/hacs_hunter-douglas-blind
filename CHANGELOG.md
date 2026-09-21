@@ -1,5 +1,12 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- "Refresh battery" button per shade: connects now and reads the battery and device info, and
+  fails with the reason (no adapter/proxy in range, connection failed, no readable battery level)
+  instead of silently leaving the sensor unavailable until the next 6-hour poll.
+
 ## [0.1.0] - 2026-09-21
 
 First release. Read-only: everything a PowerView Gen 3 shade shares without

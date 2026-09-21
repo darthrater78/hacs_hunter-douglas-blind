@@ -8,7 +8,7 @@ from homeassistant.core import HomeAssistant
 
 from .hub import PowerViewHub
 
-PLATFORMS = [Platform.SENSOR]
+PLATFORMS = [Platform.SENSOR, Platform.BUTTON]
 
 type PowerViewConfigEntry = ConfigEntry[PowerViewHub]
 

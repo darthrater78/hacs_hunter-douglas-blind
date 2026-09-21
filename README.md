@@ -21,6 +21,7 @@ Per shade (one HA device per BLE address, grouped by PowerView home ID):
 | Type ID, Capability | advertisement | unknown types fall back to bottom-up |
 | Status byte, RSSI, Raw advertisement | advertisement | diagnostic; RSSI, status byte and raw hex disabled by default |
 | Device info (model, firmware, hardware, serial) | GATT `0x180A`, best effort | shown on the device page |
+| Refresh battery (button) | GATT | reads battery and device info now; errors with the reason if it cannot (out of range, connection failed, no battery level). Automations can press it. |
 
 Confirmed on a real Duette TDBU (2026-09-21): advertisement decode and the battery read (63%).
 This integration has been tested under pytest against Home Assistant 2026.9 but not yet on a live install.

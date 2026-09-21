@@ -11,6 +11,7 @@ pytest.importorskip("pytest_homeassistant_custom_component")
 from homeassistant.config_entries import SOURCE_BLUETOOTH  # noqa: E402
 from homeassistant.core import HomeAssistant  # noqa: E402
 from homeassistant.data_entry_flow import FlowResultType  # noqa: E402
+from homeassistant.exceptions import HomeAssistantError  # noqa: E402
 from homeassistant.helpers import entity_registry as er  # noqa: E402
 from pytest_homeassistant_custom_component.common import MockConfigEntry  # noqa: E402
 
@@ -202,3 +203,77 @@ async def test_spoofed_shades_are_capped(hass: HomeAssistant):
             cb(make_info(CLOSED, address=f"AA:BB:CC:DD:EE:{i:02X}"), None)
         await hass.async_block_till_done()
     assert len(_entry.runtime_data.shades) == 2
+
+
+def _button_id(hass: HomeAssistant) -> str:
+    reg = er.async_get(hass)
+    entity_id = reg.async_get_entity_id(
+        "button", DOMAIN, "C6:83:B4:47:08:51_refresh_battery"
+    )
+    assert entity_id
+    return entity_id
+
+
+async def test_refresh_button_reads_battery_now(hass: HomeAssistant):
+    await _setup(hass, [make_info(CLOSED)])
+    assert _state(hass, "battery").state == "unavailable"
+
+    async def connect(*_a, **_k):
+        return _FakeClient()
+
+    with (
+        patch(f"{HUB}.async_ble_device_from_address", return_value=MagicMock()),
+        patch("custom_components.hacs_hunter_douglas_blind.hub.establish_connection", connect),
+    ):
+        await hass.services.async_call(
+            "button", "press", {"entity_id": _button_id(hass)}, blocking=True
+        )
+    assert _state(hass, "battery").state == "63"
+
+
+async def test_refresh_button_says_why_when_out_of_range(hass: HomeAssistant):
+    await _setup(hass, [make_info(CLOSED)])
+    with (
+        patch(f"{HUB}.async_ble_device_from_address", return_value=None),
+        pytest.raises(HomeAssistantError, match="no connectable Bluetooth adapter"),
+    ):
+        await hass.services.async_call(
+            "button", "press", {"entity_id": _button_id(hass)}, blocking=True
+        )
+
+
+async def test_refresh_button_says_why_when_connect_fails(hass: HomeAssistant):
+    from bleak.exc import BleakError
+
+    await _setup(hass, [make_info(CLOSED)])
+
+    async def connect(*_a, **_k):
+        raise BleakError("out of slots")
+
+    with (
+        patch(f"{HUB}.async_ble_device_from_address", return_value=MagicMock()),
+        patch("custom_components.hacs_hunter_douglas_blind.hub.establish_connection", connect),
+        pytest.raises(HomeAssistantError, match="connection failed"),
+    ):
+        await hass.services.async_call(
+            "button", "press", {"entity_id": _button_id(hass)}, blocking=True
+        )
+
+
+async def test_refresh_button_says_why_when_no_battery(hass: HomeAssistant):
+    await _setup(hass, [make_info(CLOSED)])
+
+    class _NoBattery(_FakeClient):
+        values = {}
+
+    async def connect(*_a, **_k):
+        return _NoBattery()
+
+    with (
+        patch(f"{HUB}.async_ble_device_from_address", return_value=MagicMock()),
+        patch("custom_components.hacs_hunter_douglas_blind.hub.establish_connection", connect),
+        pytest.raises(HomeAssistantError, match="readable battery level"),
+    ):
+        await hass.services.async_call(
+            "button", "press", {"entity_id": _button_id(hass)}, blocking=True
+        )
