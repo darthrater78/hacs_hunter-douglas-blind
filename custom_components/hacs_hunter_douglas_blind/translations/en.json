@@ -25,6 +25,9 @@
       "type_id": { "name": "Type ID" },
       "capability": { "name": "Capability" },
       "raw_advertisement": { "name": "Raw advertisement" }
+    },
+    "button": {
+      "refresh_battery": { "name": "Refresh battery" }
     }
   }
 }

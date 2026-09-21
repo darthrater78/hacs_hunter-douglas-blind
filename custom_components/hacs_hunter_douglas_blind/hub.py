@@ -139,26 +139,30 @@ class PowerViewHub:
         for shade in list(self.shades.values()):
             await self.async_poll_gatt(shade)
 
-    async def async_poll_gatt(self, shade: ShadeData) -> None:
-        """Read battery + Device Information. Best effort; failures are retried next poll."""
-        async with self._gatt_lock:
-            await self._async_read_gatt(shade)
-        async_dispatcher_send(self.hass, self.signal_update(shade.address))
+    async def async_poll_gatt(self, shade: ShadeData) -> str | None:
+        """Read battery + Device Information. Best effort; failures are retried next poll.
 
-    async def _async_read_gatt(self, shade: ShadeData) -> None:
+        Returns None when the battery was read, else a short reason it was not.
+        """
+        async with self._gatt_lock:
+            failure = await self._async_read_gatt(shade)
+        async_dispatcher_send(self.hass, self.signal_update(shade.address))
+        return failure
+
+    async def _async_read_gatt(self, shade: ShadeData) -> str | None:
         ble_device = bluetooth.async_ble_device_from_address(
             self.hass, shade.address, connectable=True
         )
         if ble_device is None:
             _LOGGER.debug("%s: no connectable adapter/proxy in range", shade.address)
-            return
+            return "no connectable Bluetooth adapter or proxy is in range of the shade"
         try:
             client = await establish_connection(
                 BleakClientWithServiceCache, ble_device, shade.address
             )
-        except _BLE_ERRORS:
+        except _BLE_ERRORS as err:
             _LOGGER.debug("%s: GATT connect failed", shade.address, exc_info=True)
-            return
+            return f"the connection failed ({type(err).__name__})"
         try:
             await self._read_battery(client, shade)
             await self._read_device_info(client, shade)
@@ -167,6 +171,9 @@ class PowerViewHub:
                 await client.disconnect()
             except _BLE_ERRORS:
                 _LOGGER.debug("%s: disconnect failed", shade.address, exc_info=True)
+        if shade.battery_supported:
+            return None
+        return "connected, but the shade did not return a readable battery level"
 
     async def _read_battery(self, client: BleakClientWithServiceCache, shade: ShadeData) -> None:
         try:
