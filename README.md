@@ -23,13 +23,14 @@ Per shade (one HA device per BLE address, grouped by PowerView home ID):
 | Device info (model, firmware, hardware, serial) | GATT `0x180A`, best effort | shown on the device page |
 
 Confirmed on a real Duette TDBU (2026-09-21): advertisement decode and the battery read (63%).
+This integration has been tested under pytest against Home Assistant 2026.9 but not yet on a live install.
 Unconfirmed on hardware (see docs/PROTOCOL.md §8): Device Information characteristic set,
 whether mains-powered shades expose battery, and the meaning of the status byte.
 Position values are reported as broadcast (top-down shades are not inverted here).
 
 ## Install
 
-HACS → Custom repositories → add this repo as an *Integration*, then restart HA.
+HACS → Custom repositories → add this repo as an *Integration* (Home Assistant 2026.9.0 or newer), then restart HA.
 
 ## Development
 

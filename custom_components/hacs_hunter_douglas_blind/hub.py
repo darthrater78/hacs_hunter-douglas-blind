@@ -38,6 +38,12 @@ _LOGGER = logging.getLogger(__name__)
 _BLE_ERRORS = (BleakError, TimeoutError, OSError)
 
 
+def _clean_text(raw: bytes) -> str:
+    """Printable text from a GATT string; the peer may be a spoofed device."""
+    text = raw.decode("utf-8", "replace")
+    return "".join(ch for ch in text if ch.isprintable()).strip()[:64]
+
+
 @dataclass
 class ShadeData:
     """Latest known state of one shade (one BLE address)."""
@@ -184,4 +190,4 @@ class PowerViewHub:
             except _BLE_ERRORS:
                 _LOGGER.debug("%s: %s not readable", shade.address, key)
                 continue
-            shade.device_info[key] = value.decode("utf-8", "replace").strip("\x00 ")[:64]
+            shade.device_info[key] = _clean_text(value)
