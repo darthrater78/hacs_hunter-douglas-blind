@@ -24,7 +24,9 @@ Per shade (one HA device per BLE address, grouped by PowerView home ID):
 | Refresh battery (button) | GATT | reads battery and device info now; errors with the reason if it cannot (out of range, connection failed, no battery level). Automations can press it. |
 
 Confirmed on a real Duette TDBU (2026-09-21): advertisement decode and the battery read (63%).
-This integration has been tested under pytest against Home Assistant 2026.9 but not yet on a live install.
+Running on a live Home Assistant 2026.9.3 install with an ESPHome Bluetooth proxy, the advertisement
+sensors match the shade; the GATT reads (battery, device info) have not succeeded there yet, and the
+Refresh battery button reports why.
 Unconfirmed on hardware (see docs/PROTOCOL.md §8): Device Information characteristic set,
 whether mains-powered shades expose battery, and the meaning of the status byte.
 Position values are reported as broadcast (top-down shades are not inverted here).
