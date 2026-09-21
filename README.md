@@ -36,6 +36,7 @@ HACS → Custom repositories → add this repo as an *Integration*, then restart
 ```
 python3.14 -m venv .venv && . .venv/bin/activate
 pip install -r requirements_test.txt
+pip install -r requirements_test_overrides.txt   # separate run: pip rejects the conflicting pin
 pytest
 ```
 
@@ -49,3 +50,7 @@ CI runs HACS validation, hassfest and the tests. Releases: bump `manifest.json` 
 
 Shade keystreams/AES keys grant control of your shades. Never commit them; store them via
 HA's config entry storage only.
+
+## License
+
+MIT — see [LICENSE](LICENSE).

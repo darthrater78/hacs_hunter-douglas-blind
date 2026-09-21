@@ -69,10 +69,12 @@ jobs:
         with:
           python-version: '3.14'
           cache: pip
-          cache-dependency-path: requirements_test.txt
+          cache-dependency-path: requirements_test*.txt
 
       - name: Install test dependencies
-        run: python3 -m pip install -r requirements_test.txt
+        run: |
+          python3 -m pip install -r requirements_test.txt
+          python3 -m pip install -r requirements_test_overrides.txt
 
       - name: Run tests
         run: python3 -m pytest -q

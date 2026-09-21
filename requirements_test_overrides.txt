@@ -1,0 +1,7 @@
+# Test-only. Installed AFTER requirements_test.txt, in a separate pip run,
+# because Home Assistant core pins these exactly and pip's resolver rejects a
+# direct conflicting pin. Remove an entry once the pinned core catches up.
+#
+# cryptography: core 2026.9.3 pins 48.0.1, which has 3 open advisories
+# (fixed in 49.0.0 / 50.0.0). Nothing here ships with the integration.
+cryptography==50.0.1
