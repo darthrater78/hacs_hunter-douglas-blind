@@ -1,11 +1,19 @@
 # Changelog
 
-## [Unreleased]
+## [0.2.0] - 2026-09-21
 
 ### Added
 - "Refresh battery" button per shade: connects now and reads the battery and device info, and
   fails with the reason (no adapter/proxy in range, connection failed, no readable battery level)
   instead of silently leaving the sensor unavailable until the next 6-hour poll.
+  Automations can press it.
+
+### Known limitations
+- First live install (Home Assistant 2026.9.3, ESPHome Bluetooth proxy, Duette TDBU type 8): the
+  advertisement sensors match the shade, but the GATT reads have not yet succeeded there. Battery
+  stays unavailable and firmware/hardware/serial are empty. The Refresh battery button reports why.
+- Still unconfirmed: which Device Information characteristics exist, whether mains-powered shades
+  expose battery, the meaning of the status byte, and behaviour of type IDs other than 8.
 
 ## [0.1.0] - 2026-09-21
 
