@@ -13,7 +13,21 @@ updates:
   # Test tooling. pytest-homeassistant-custom-component moves with Home
   # Assistant core; the bluetooth pins below it must move with the same release
   # (see requirements_test.txt), so review those together.
+  #
+  # Those bluetooth pins mirror core's bluetooth manifest so tests run against
+  # what Home Assistant actually ships. Bumping one alone tests versions no core
+  # release uses, so Dependabot skips them; re-copy them when the core moves.
   - package-ecosystem: "pip"
     directory: "/"
     schedule:
       interval: "weekly"
+    ignore:
+      - dependency-name: "aiousbwatcher"
+      - dependency-name: "bleak"
+      - dependency-name: "bleak-retry-connector"
+      - dependency-name: "bluetooth-adapters"
+      - dependency-name: "bluetooth-auto-recovery"
+      - dependency-name: "bluetooth-data-tools"
+      - dependency-name: "dbus-fast"
+      - dependency-name: "habluetooth"
+      - dependency-name: "serialx"
