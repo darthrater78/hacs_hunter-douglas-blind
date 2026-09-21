@@ -3,6 +3,7 @@
 ## [0.1.0] - Unreleased
 
 ### Added
+- Integration icon (`brand/icon.png`, 256×256), which HACS validation requires.
 - Dependabot ignores the Bluetooth test pins that mirror Home Assistant core's manifest; they move with core, not on their own.
 - MIT `LICENSE`.
 - `requirements_test_overrides.txt`: test-only `cryptography` 50.0.1 (Home Assistant core pins 48.0.1, which has open advisories); CI installs it as a second step.
