@@ -140,6 +140,7 @@ async def test_gatt_poll_reads_battery_and_device_info(hass: HomeAssistant):
 
     with (
         patch(f"{HUB}.async_ble_device_from_address", return_value=MagicMock()),
+        patch(f"{HUB}.async_last_service_info", return_value=None),
         patch("custom_components.hacs_hunter_douglas_blind.hub.establish_connection", connect),
     ):
         await hub.async_poll_gatt(shade)
@@ -168,6 +169,7 @@ async def test_gatt_device_info_drops_control_characters(hass: HomeAssistant):
 
     with (
         patch(f"{HUB}.async_ble_device_from_address", return_value=MagicMock()),
+        patch(f"{HUB}.async_last_service_info", return_value=None),
         patch("custom_components.hacs_hunter_douglas_blind.hub.establish_connection", connect),
     ):
         await hub.async_poll_gatt(shade)
@@ -186,6 +188,7 @@ async def test_gatt_failure_leaves_battery_unavailable(hass: HomeAssistant):
 
     with (
         patch(f"{HUB}.async_ble_device_from_address", return_value=MagicMock()),
+        patch(f"{HUB}.async_last_service_info", return_value=None),
         patch("custom_components.hacs_hunter_douglas_blind.hub.establish_connection", connect),
     ):
         await hub.async_poll_gatt(hub.shades["C6:83:B4:47:08:51"])
@@ -223,6 +226,7 @@ async def test_refresh_button_reads_battery_now(hass: HomeAssistant):
 
     with (
         patch(f"{HUB}.async_ble_device_from_address", return_value=MagicMock()),
+        patch(f"{HUB}.async_last_service_info", return_value=None),
         patch("custom_components.hacs_hunter_douglas_blind.hub.establish_connection", connect),
     ):
         await hass.services.async_call(
@@ -252,8 +256,9 @@ async def test_refresh_button_says_why_when_connect_fails(hass: HomeAssistant):
 
     with (
         patch(f"{HUB}.async_ble_device_from_address", return_value=MagicMock()),
+        patch(f"{HUB}.async_last_service_info", return_value=None),
         patch("custom_components.hacs_hunter_douglas_blind.hub.establish_connection", connect),
-        pytest.raises(HomeAssistantError, match="connection failed"),
+        pytest.raises(HomeAssistantError, match="connection failed.*out of slots"),
     ):
         await hass.services.async_call(
             "button", "press", {"entity_id": _button_id(hass)}, blocking=True
@@ -271,6 +276,7 @@ async def test_refresh_button_says_why_when_no_battery(hass: HomeAssistant):
 
     with (
         patch(f"{HUB}.async_ble_device_from_address", return_value=MagicMock()),
+        patch(f"{HUB}.async_last_service_info", return_value=None),
         patch("custom_components.hacs_hunter_douglas_blind.hub.establish_connection", connect),
         pytest.raises(HomeAssistantError, match="readable battery level"),
     ):
