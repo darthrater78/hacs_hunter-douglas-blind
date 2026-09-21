@@ -55,6 +55,7 @@ class ShadeData:
     last_seen: datetime = field(default_factory=dt_util.utcnow)
     battery: int | None = None
     battery_supported: bool | None = None  # None = not yet tried
+    connect_warned: bool = False
     device_info: dict[str, str] = field(default_factory=dict)
     last_raw: str = ""
 
@@ -158,11 +159,26 @@ class PowerViewHub:
             return "no connectable Bluetooth adapter or proxy is in range of the shade"
         try:
             client = await establish_connection(
-                BleakClientWithServiceCache, ble_device, shade.address
+                BleakClientWithServiceCache, ble_device, shade.address, max_attempts=3
             )
         except _BLE_ERRORS as err:
-            _LOGGER.debug("%s: GATT connect failed", shade.address, exc_info=True)
-            return f"the connection failed ({type(err).__name__})"
+            # Warn once with what we know about the link, so the cause is visible
+            # without debug logging.
+            log = _LOGGER.debug if shade.connect_warned else _LOGGER.warning
+            shade.connect_warned = True
+            log(
+                "%s: GATT connect failed: %s (details=%s, rssi=%s, "
+                "connectable advert seen=%s)",
+                shade.address,
+                err,
+                getattr(ble_device, "details", None),
+                shade.rssi,
+                bluetooth.async_last_service_info(
+                    self.hass, shade.address, connectable=True
+                )
+                is not None,
+            )
+            return f"the connection failed ({type(err).__name__}: {str(err)[:160]})"
         try:
             await self._read_battery(client, shade)
             await self._read_device_info(client, shade)
