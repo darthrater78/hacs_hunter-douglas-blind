@@ -151,6 +151,29 @@ async def test_gatt_poll_reads_battery_and_device_info(hass: HomeAssistant):
     }
 
 
+async def test_gatt_device_info_drops_control_characters(hass: HomeAssistant):
+    """A spoofed device must not smuggle control characters into the registry."""
+    entry, _cb = await _setup(hass, [make_info(CLOSED)])
+    hub = entry.runtime_data
+    shade = hub.shades["C6:83:B4:47:08:51"]
+
+    class _Hostile(_FakeClient):
+        values = {
+            "00002a29-0000-1000-8000-00805f9b34fb": b"Evil\x1b[31m\nCorp\x00\x07",
+        }
+
+    async def connect(*_a, **_k):
+        return _Hostile()
+
+    with (
+        patch(f"{HUB}.async_ble_device_from_address", return_value=MagicMock()),
+        patch("custom_components.hacs_hunter_douglas_blind.hub.establish_connection", connect),
+    ):
+        await hub.async_poll_gatt(shade)
+
+    assert shade.device_info == {"manufacturer": "Evil[31mCorp"}
+
+
 async def test_gatt_failure_leaves_battery_unavailable(hass: HomeAssistant):
     from bleak.exc import BleakError
 
