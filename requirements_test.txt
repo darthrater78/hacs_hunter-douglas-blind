@@ -7,7 +7,7 @@ pytest-homeassistant-custom-component==0.13.366
 # at the pinned core version); the core wheel does not install them.
 aiousbwatcher==1.1.2
 bleak==3.0.2
-bleak-retry-connector==4.7.0
+bleak-retry-connector==4.7.1
 bluetooth-adapters==2.4.0
 bluetooth-auto-recovery==1.6.4
 bluetooth-data-tools==1.29.24
