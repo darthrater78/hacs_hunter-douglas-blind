@@ -1,0 +1,69 @@
+name: CI
+
+# Documentation-only pull requests skip CI: HACS validation, hassfest and the
+# test suite read the integration, not the prose. A path is only safe to ignore
+# if no job inspects it -- hacs.json, manifest.json, strings.json and
+# translations/ are all validated, so they must never be listed here.
+#
+# Pushes are deliberately NOT filtered. release.yml's gate refuses to publish a
+# tag whose commit has no passing CI run, and a path-skipped workflow produces
+# no run at all -- not a skipped one -- so `runs?head_sha=` comes back empty and
+# the gate reports "CI has never run for this SHA". Filtering pushes would make
+# that fire on any docs-only commit, at the moment you are trying to ship.
+# Leaving push unfiltered means every commit that could be tagged always has a
+# run; PR churn is where the repeated runs were being spent anyway, so this
+# costs one run per merge.
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+    paths-ignore:
+      - '**/*.md'
+      - 'LICENSE'
+      - '.gitignore'
+      - 'examples/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  hacs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: HACS validation
+        uses: hacs/action@main # intentionally unpinned — see Template best practices, Security
+        with:
+          category: integration
+
+  hassfest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Hassfest validation
+        uses: home-assistant/actions/hassfest@master # intentionally unpinned, same as HACS
+
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Run tests
+        run: python3 -m unittest discover tests -v

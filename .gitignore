@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.storage/
+.env*
+*.pem
+*.key
+# Shade keystreams / AES keys must never be committed.
+*.keystream
+
+# Local assistant working files: gate tracker, session handoff notes.
+.claude/

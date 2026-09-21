@@ -1,0 +1,13 @@
+{
+  "domain": "hacs_hunter_douglas_blind",
+  "name": "Hunter Douglas PowerView BLE",
+  "bluetooth": [{"manufacturer_id": 2073}],
+  "codeowners": ["@darthrater78"],
+  "config_flow": true,
+  "dependencies": ["bluetooth_adapters"],
+  "documentation": "https://github.com/darthrater78/hacs_hunter-douglas-blind",
+  "iot_class": "local_push",
+  "issue_tracker": "https://github.com/darthrater78/hacs_hunter-douglas-blind/issues",
+  "requirements": [],
+  "version": "0.1.0"
+}

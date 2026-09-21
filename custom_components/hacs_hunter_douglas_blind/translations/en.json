@@ -1,0 +1,30 @@
+{
+  "config": {
+    "flow_title": "PowerView home {home_id}",
+    "step": {
+      "user": {
+        "description": "Pick a PowerView home seen over Bluetooth. Shades in the same home share a home ID.",
+        "data": { "home_id": "Home" }
+      },
+      "confirm": {
+        "description": "Add the Hunter Douglas PowerView home {home_id}? Shade state is read from Bluetooth advertisements; controlling shades is not supported yet."
+      }
+    },
+    "abort": {
+      "not_supported": "This device is not a supported PowerView Gen 3 shade.",
+      "no_devices_found": "No new PowerView homes found in Bluetooth range.",
+      "already_configured": "This PowerView home is already configured."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "primary": { "name": "Position" },
+      "secondary": { "name": "Secondary position" },
+      "tilt": { "name": "Tilt" },
+      "status_byte": { "name": "Status byte" },
+      "type_id": { "name": "Type ID" },
+      "capability": { "name": "Capability" },
+      "raw_advertisement": { "name": "Raw advertisement" }
+    }
+  }
+}
