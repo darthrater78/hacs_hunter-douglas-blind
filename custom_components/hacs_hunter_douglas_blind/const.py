@@ -13,6 +13,15 @@ CONF_HOME_ID = "home_id"
 # pushed. Position and tilt arrive for free in advertisements.
 GATT_POLL_INTERVAL = timedelta(hours=6)
 
+# Retries inside one poll. Each attempt is a full connect cycle, so this is the
+# difference between a slow read and a shade that holds the radio for a minute.
+CONNECT_ATTEMPTS = 3
+
+# How long a read someone is waiting on (the Refresh battery button) queues
+# behind another shade's read before it reports back instead. Long enough for a
+# normal connect/read to finish; short enough to beat a user pressing again.
+MANUAL_POLL_WAIT = 20.0
+
 # Standard GATT (docs/PROTOCOL.md §1). Device Information characteristics are
 # best-effort: the framework confirmed only the Battery read on real hardware.
 CHAR_BATTERY_LEVEL = "00002a19-0000-1000-8000-00805f9b34fb"

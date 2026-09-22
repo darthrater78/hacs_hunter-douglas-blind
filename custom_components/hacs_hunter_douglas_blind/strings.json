@@ -24,6 +24,8 @@
       "status_byte": { "name": "Status byte" },
       "type_id": { "name": "Type ID" },
       "capability": { "name": "Capability" },
+      "gatt_status": { "name": "GATT status" },
+      "last_gatt_attempt": { "name": "Last GATT attempt" },
       "raw_advertisement": { "name": "Raw advertisement" }
     },
     "button": {

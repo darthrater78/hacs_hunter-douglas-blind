@@ -32,6 +32,18 @@ class ShadeSensorDescription(SensorEntityDescription):
 
 DIAG = EntityCategory.DIAGNOSTIC
 
+# A sensor state is capped at 255 characters and a failure reason carries a
+# truncated exception string, so it is clipped rather than dropped by HA.
+MAX_STATE_LENGTH = 255
+
+
+def gatt_status(shade: ShadeData) -> str | None:
+    """Outcome of the last GATT attempt: None before the first one, else why it failed."""
+    if shade.last_attempt is None:
+        return None
+    return (shade.last_error or "ok")[:MAX_STATE_LENGTH]
+
+
 SENSORS: tuple[ShadeSensorDescription, ...] = (
     ShadeSensorDescription(
         key="primary",
@@ -87,6 +99,20 @@ SENSORS: tuple[ShadeSensorDescription, ...] = (
         translation_key="capability",
         entity_category=DIAG,
         value_fn=lambda s, c: c.name,
+    ),
+    ShadeSensorDescription(
+        key="gatt_status",
+        translation_key="gatt_status",
+        entity_category=DIAG,
+        value_fn=lambda s, c: gatt_status(s),
+    ),
+    ShadeSensorDescription(
+        key="last_gatt_attempt",
+        translation_key="last_gatt_attempt",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        entity_category=DIAG,
+        entity_registry_enabled_default=False,
+        value_fn=lambda s, c: s.last_attempt,
     ),
     ShadeSensorDescription(
         key="rssi",
