@@ -31,6 +31,7 @@ from .const import (
     GATT_POLL_INTERVAL,
     MANUFACTURER_ID,
     MAX_SHADES,
+    WARN_INTERVAL,
 )
 from .protocol import Advertisement, parse_advertisement
 
@@ -61,7 +62,9 @@ class ShadeData:
     last_seen: datetime = field(default_factory=dt_util.utcnow)
     battery: int | None = None
     battery_supported: bool | None = None  # None = not yet tried
-    connect_warned: bool = False
+    # Rate limit for the connect warning: what kind of failure, and when.
+    warned_kind: str | None = None
+    warned_at: datetime | None = None
     # Why the last GATT attempt failed, and when it ran. Exposed as diagnostic
     # sensors so a failing read can be seen without reading the log.
     last_error: str | None = None
@@ -191,7 +194,35 @@ class PowerViewHub:
         info = bluetooth.async_last_service_info(self.hass, address, connectable=True)
         return info.source if info is not None else "unknown"
 
+    def _should_warn(self, shade: ShadeData, kind: str) -> bool:
+        """Warn on a new kind of failure, and again once an hour while it persists.
+
+        Keyed on the exception type rather than the message: a bleak connect
+        error embeds the attempt count and the age of the last advertisement, so
+        keying on the text would make every attempt look new and warn every
+        time. The full message still reaches the log line and the GATT status
+        sensor -- only the decision to warn is coarsened.
+        """
+        now = dt_util.utcnow()
+        if (
+            shade.warned_kind == kind
+            and shade.warned_at is not None
+            and now - shade.warned_at < WARN_INTERVAL
+        ):
+            return False
+        shade.warned_kind = kind
+        shade.warned_at = now
+        return True
+
     async def _async_try_read(self, shade: ShadeData) -> str | None:
+        # Home Assistant answers from its advertisement history, so a device
+        # comes back even when no scanner is registered -- which is what a poll
+        # right after a restart sees, before any proxy has connected. Without
+        # this check every attempt is spent against a stack that has no radio.
+        if not bluetooth.async_scanner_count(self.hass, connectable=True):
+            _LOGGER.debug("%s: no Bluetooth scanner registered yet", shade.address)
+            return "Home Assistant has no Bluetooth adapter or proxy registered yet"
+
         ble_device = bluetooth.async_ble_device_from_address(
             self.hass, shade.address, connectable=True
         )
@@ -224,13 +255,19 @@ class PowerViewHub:
                 ble_device_callback=_fresh_device,
             )
         except _BLE_ERRORS as err:
-            # Warn once with what we know about the link, so the cause is visible
-            # without debug logging. `connectable=True` below is a property of
+            # Warn with what we know about the link, so the cause is visible
+            # without debug logging -- rate limited, not once ever, so the
+            # steady-state failure is not hidden behind the first one seen.
+            # `connectable=True` below is a property of
             # the *scanner* that heard the shade, not of the shade's advertising
             # PDU -- it says a connection-capable radio is in range, and nothing
             # about whether the shade is accepting connections.
-            log = _LOGGER.debug if shade.connect_warned else _LOGGER.warning
-            shade.connect_warned = True
+            reason = f"the connection failed ({type(err).__name__}: {_printable(str(err), 160)})"
+            log = (
+                _LOGGER.warning
+                if self._should_warn(shade, type(err).__name__)
+                else _LOGGER.debug
+            )
             log(
                 "%s: GATT connect failed: %s (via=%s, details=%s, rssi=%s, "
                 "still heard by a connection-capable scanner=%s)",
@@ -244,10 +281,7 @@ class PowerViewHub:
                 )
                 is not None,
             )
-            return (
-                f"the connection failed "
-                f"({type(err).__name__}: {_printable(str(err), 160)})"
-            )
+            return reason
         try:
             await self._read_battery(client, shade)
             await self._read_device_info(client, shade)

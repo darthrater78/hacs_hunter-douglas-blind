@@ -22,6 +22,12 @@ CONNECT_ATTEMPTS = 3
 # normal connect/read to finish; short enough to beat a user pressing again.
 MANUAL_POLL_WAIT = 20.0
 
+# How often the same failure may warn again. Warning only once per shade per
+# Home Assistant lifetime keeps whichever failure happened first -- typically a
+# start-up race, before any proxy has registered -- and hides every steady-state
+# failure behind it at DEBUG.
+WARN_INTERVAL = timedelta(hours=1)
+
 # Standard GATT (docs/PROTOCOL.md §1). Device Information characteristics are
 # best-effort: the framework confirmed only the Battery read on real hardware.
 CHAR_BATTERY_LEVEL = "00002a19-0000-1000-8000-00805f9b34fb"

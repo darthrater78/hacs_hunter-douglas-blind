@@ -34,6 +34,13 @@ def _bluetooth_present(hass: HomeAssistant):
     hass.config.components.update({"bluetooth", "bluetooth_adapters"})
 
 
+@pytest.fixture(autouse=True)
+def _one_scanner():
+    """A connectable scanner is registered unless a test overrides this."""
+    with patch(f"{HUB}.async_scanner_count", return_value=1):
+        yield
+
+
 async def _setup(hass: HomeAssistant, seen: list):
     entry = MockConfigEntry(domain=DOMAIN, data={CONF_HOME_ID: 63548}, unique_id="63548")
     entry.add_to_hass(hass)
@@ -464,3 +471,48 @@ def test_gatt_status_is_unknown_before_any_attempt():
 
     shade.last_error = "the connection failed"
     assert gatt_status(shade) == "the connection failed"
+
+
+async def test_poll_stops_before_the_radio_when_no_scanner_is_registered(hass: HomeAssistant):
+    """The start-up race: HA answers from advert history while no scanner exists."""
+    entry, _cb = await _setup(hass, [make_info(CLOSED)])
+    hub = entry.runtime_data
+    reached_radio = False
+
+    async def connect(*_a, **_k):
+        nonlocal reached_radio
+        reached_radio = True
+        return _FakeClient()
+
+    with (
+        patch(f"{HUB}.async_scanner_count", return_value=0),
+        # A device still comes back -- from history -- which is the trap.
+        patch(f"{HUB}.async_ble_device_from_address", return_value=MagicMock()),
+        patch(f"{HUB}.async_last_service_info", return_value=None),
+        patch("custom_components.hacs_hunter_douglas_blind.hub.establish_connection", connect),
+    ):
+        failure = await hub.async_poll_gatt(hub.shades["C6:83:B4:47:08:51"])
+
+    assert failure is not None
+    assert "no Bluetooth adapter or proxy registered" in failure
+    assert not reached_radio
+
+
+async def test_the_same_failure_warns_again_only_after_the_interval(hass: HomeAssistant):
+    """Warn-once kept the first failure and hid every later one at DEBUG."""
+    from homeassistant.util import dt as dt_util
+
+    from custom_components.hacs_hunter_douglas_blind.const import WARN_INTERVAL
+
+    entry, _cb = await _setup(hass, [make_info(CLOSED)])
+    hub = entry.runtime_data
+    shade = hub.shades["C6:83:B4:47:08:51"]
+    shade.warned_kind, shade.warned_at = None, None
+
+    assert hub._should_warn(shade, "BleakError") is True
+    assert hub._should_warn(shade, "BleakError") is False  # still inside the hour
+    # A different kind of failure is news, whenever it happens.
+    assert hub._should_warn(shade, "TimeoutError") is True
+
+    shade.warned_at = dt_util.utcnow() - WARN_INTERVAL
+    assert hub._should_warn(shade, "TimeoutError") is True
