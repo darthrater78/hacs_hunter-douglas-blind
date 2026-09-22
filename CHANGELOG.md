@@ -1,5 +1,34 @@
 # Changelog
 
+## [0.3.0] - 2026-09-22
+
+Diagnostics only. Nothing here makes a shade's battery readable; it makes a failed read explain itself,
+after the v0.2.1 diagnosis turned out to rest on a misread log field.
+
+### Added
+- **GATT status** and **Last GATT attempt** diagnostic sensors per shade: the reason the last read failed
+  (or `ok`) and when it ran, so a failing read is visible on the device page instead of only in the log
+  and a button error.
+
+### Changed
+- Every connect attempt logs which radio it used (`via=<proxy MAC or adapter>`). With more than one proxy,
+  or a dongle added later, "which radio was this?" is the first question about a failure.
+- Retries re-resolve the Bluetooth device instead of reusing the one captured before the first attempt,
+  so a retry can move to whichever adapter or proxy Home Assistant currently considers best.
+- The connect warning is rate limited (a new reason, or once an hour) instead of once per shade per
+  Home Assistant lifetime. Warning once kept whichever failure happened first -- typically a start-up
+  race -- and hid every steady-state failure behind it at DEBUG.
+- A poll stops before touching the radio when no connectable scanner is registered. Home Assistant answers
+  from advertisement history, so a poll shortly after a restart would otherwise spend every attempt against
+  a stack that has no radio yet.
+- The **Refresh battery** button gives up after 20s of waiting behind another shade's read and says so,
+  rather than blocking for as long as that read takes. Background polls still wait their turn.
+
+### Fixed
+- The connect-failure log said `connectable advert seen`, which describes the *scanner* that heard the
+  shade rather than the shade's advertising PDU. It was being read as evidence the shade accepts
+  connections, which it never was.
+
 ## [0.2.1] - 2026-09-21
 
 ### Changed

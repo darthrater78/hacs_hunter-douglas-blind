@@ -20,13 +20,18 @@ Per shade (one HA device per BLE address, grouped by PowerView home ID):
 | Battery | GATT `0x2A19`, polled every 6 h | unavailable until a read succeeds |
 | Type ID, Capability | advertisement | unknown types fall back to bottom-up |
 | Status byte, RSSI, Raw advertisement | advertisement | diagnostic; RSSI, status byte and raw hex disabled by default |
+| GATT status | last read attempt | diagnostic; `ok`, or why the last attempt failed |
+| Last GATT attempt | last read attempt | diagnostic, disabled by default; when it ran |
 | Device info (model, firmware, hardware, serial) | GATT `0x180A`, best effort | shown on the device page |
 | Refresh battery (button) | GATT | reads battery and device info now; errors with the reason if it cannot (out of range, connection failed, no battery level). Automations can press it. |
 
 Confirmed on a real Duette TDBU (2026-09-21): advertisement decode and the battery read (63%).
 Running on a live Home Assistant 2026.9.3 install with an ESPHome Bluetooth proxy, the advertisement
-sensors match the shade; the GATT reads (battery, device info) have not succeeded there yet, and the
-Refresh battery button reports why.
+sensors match the shade; the GATT reads (battery, device info) have not succeeded there yet. The
+**GATT status** sensor carries the reason, and the Refresh battery button raises it. On that install
+the connection is refused by the shade or never established by the proxy (`ESP_GATT_ERROR`, HCI `0x3E`)
+with a single ESP32 proxy in range; whether that is the radio or the shade declining an un-enrolled
+central is still open -- see `docs/HANDOFF.md`.
 Unconfirmed on hardware (see docs/PROTOCOL.md §8): Device Information characteristic set,
 whether mains-powered shades expose battery, and the meaning of the status byte.
 Position values are reported as broadcast (top-down shades are not inverted here).
