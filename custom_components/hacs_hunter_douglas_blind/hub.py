@@ -12,6 +12,7 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 
+from bleak.backends.device import BLEDevice
 from bleak.exc import BleakError
 from bleak_retry_connector import BleakClientWithServiceCache, establish_connection
 from homeassistant.components import bluetooth
@@ -24,6 +25,7 @@ from homeassistant.util import dt as dt_util
 from .const import (
     CHAR_BATTERY_LEVEL,
     CONF_HOME_ID,
+    CONNECT_ATTEMPTS,
     DEVICE_INFO_CHARS,
     DOMAIN,
     GATT_POLL_INTERVAL,
@@ -38,10 +40,14 @@ _LOGGER = logging.getLogger(__name__)
 _BLE_ERRORS = (BleakError, TimeoutError, OSError)
 
 
+def _printable(text: str, limit: int) -> str:
+    """Printable, bounded text. Anything sourced from the peer goes through this."""
+    return "".join(ch for ch in text if ch.isprintable()).strip()[:limit]
+
+
 def _clean_text(raw: bytes) -> str:
     """Printable text from a GATT string; the peer may be a spoofed device."""
-    text = raw.decode("utf-8", "replace")
-    return "".join(ch for ch in text if ch.isprintable()).strip()[:64]
+    return _printable(raw.decode("utf-8", "replace"), 64)
 
 
 @dataclass
@@ -56,6 +62,10 @@ class ShadeData:
     battery: int | None = None
     battery_supported: bool | None = None  # None = not yet tried
     connect_warned: bool = False
+    # Why the last GATT attempt failed, and when it ran. Exposed as diagnostic
+    # sensors so a failing read can be seen without reading the log.
+    last_error: str | None = None
+    last_attempt: datetime | None = None
     device_info: dict[str, str] = field(default_factory=dict)
     last_raw: str = ""
 
@@ -140,37 +150,93 @@ class PowerViewHub:
         for shade in list(self.shades.values()):
             await self.async_poll_gatt(shade)
 
-    async def async_poll_gatt(self, shade: ShadeData) -> str | None:
+    async def async_poll_gatt(
+        self, shade: ShadeData, *, wait: float | None = None
+    ) -> str | None:
         """Read battery + Device Information. Best effort; failures are retried next poll.
 
         Returns None when the battery was read, else a short reason it was not.
+
+        One shade is read at a time, so a caller can queue behind another
+        shade's connect attempts. `wait` bounds that queueing: background reads
+        wait their turn (the default), while a caller someone is watching passes
+        a timeout and gets an answer instead of a spinner. A timeout here is not
+        a radio failure, so it is reported without touching `last_error`.
         """
-        async with self._gatt_lock:
+        try:
+            await asyncio.wait_for(self._gatt_lock.acquire(), wait)
+        except TimeoutError:
+            _LOGGER.debug("%s: another GATT read still holds the radio", shade.address)
+            return "another shade is being read right now; try again in a moment"
+        try:
             failure = await self._async_read_gatt(shade)
+        finally:
+            self._gatt_lock.release()
         async_dispatcher_send(self.hass, self.signal_update(shade.address))
         return failure
 
     async def _async_read_gatt(self, shade: ShadeData) -> str | None:
+        """Run one attempt, recording its outcome on the shade."""
+        shade.last_attempt = dt_util.utcnow()
+        shade.last_error = await self._async_try_read(shade)
+        return shade.last_error
+
+    def _scanner_source(self, address: str) -> str:
+        """Which radio HA would connect through: a proxy's MAC, or a local adapter.
+
+        Worth logging on every attempt: once a second proxy or a USB dongle is
+        added, "which radio was this?" is the first question about a failure,
+        and the answer can change between one attempt and the next.
+        """
+        info = bluetooth.async_last_service_info(self.hass, address, connectable=True)
+        return info.source if info is not None else "unknown"
+
+    async def _async_try_read(self, shade: ShadeData) -> str | None:
         ble_device = bluetooth.async_ble_device_from_address(
             self.hass, shade.address, connectable=True
         )
         if ble_device is None:
             _LOGGER.debug("%s: no connectable adapter/proxy in range", shade.address)
             return "no connectable Bluetooth adapter or proxy is in range of the shade"
+
+        source = self._scanner_source(shade.address)
+        _LOGGER.debug(
+            "%s: connecting via %s (rssi=%s)", shade.address, source, shade.rssi
+        )
+
+        def _fresh_device() -> BLEDevice:
+            # Re-resolved per attempt: HA picks the best connectable radio at
+            # call time, so a retry can move to another proxy or a dongle added
+            # since. Reusing one BLEDevice pins every retry to the first radio.
+            return (
+                bluetooth.async_ble_device_from_address(
+                    self.hass, shade.address, connectable=True
+                )
+                or ble_device
+            )
+
         try:
             client = await establish_connection(
-                BleakClientWithServiceCache, ble_device, shade.address, max_attempts=3
+                BleakClientWithServiceCache,
+                ble_device,
+                shade.address,
+                max_attempts=CONNECT_ATTEMPTS,
+                ble_device_callback=_fresh_device,
             )
         except _BLE_ERRORS as err:
             # Warn once with what we know about the link, so the cause is visible
-            # without debug logging.
+            # without debug logging. `connectable=True` below is a property of
+            # the *scanner* that heard the shade, not of the shade's advertising
+            # PDU -- it says a connection-capable radio is in range, and nothing
+            # about whether the shade is accepting connections.
             log = _LOGGER.debug if shade.connect_warned else _LOGGER.warning
             shade.connect_warned = True
             log(
-                "%s: GATT connect failed: %s (details=%s, rssi=%s, "
-                "connectable advert seen=%s)",
+                "%s: GATT connect failed: %s (via=%s, details=%s, rssi=%s, "
+                "still heard by a connection-capable scanner=%s)",
                 shade.address,
                 err,
+                source,
                 getattr(ble_device, "details", None),
                 shade.rssi,
                 bluetooth.async_last_service_info(
@@ -178,7 +244,10 @@ class PowerViewHub:
                 )
                 is not None,
             )
-            return f"the connection failed ({type(err).__name__}: {str(err)[:160]})"
+            return (
+                f"the connection failed "
+                f"({type(err).__name__}: {_printable(str(err), 160)})"
+            )
         try:
             await self._read_battery(client, shade)
             await self._read_device_info(client, shade)

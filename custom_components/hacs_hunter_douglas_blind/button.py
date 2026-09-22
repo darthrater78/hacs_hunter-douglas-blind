@@ -11,7 +11,7 @@ from homeassistant.helpers.device_registry import CONNECTION_BLUETOOTH, DeviceIn
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN
+from .const import DOMAIN, MANUAL_POLL_WAIT
 from .hub import PowerViewHub, ShadeData
 
 REFRESH_BATTERY = ButtonEntityDescription(
@@ -52,6 +52,8 @@ class RefreshBatteryButton(ButtonEntity):
         )
 
     async def async_press(self) -> None:
-        failure = await self._hub.async_poll_gatt(self._hub.shades[self._address])
+        failure = await self._hub.async_poll_gatt(
+            self._hub.shades[self._address], wait=MANUAL_POLL_WAIT
+        )
         if failure:
             raise HomeAssistantError(f"Could not refresh the battery: {failure}")
