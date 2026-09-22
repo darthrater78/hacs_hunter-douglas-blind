@@ -1,7 +1,11 @@
 # Handoff: HACS integration for Hunter Douglas PowerView Gen 3 (BLE)
 
-Written 2026-09-22, after v0.3.0 shipped. Restart with dev-skills loaded (manual mode) and read this first.
-**The v0.2.1 diagnosis in the previous handoff was wrong** -- see "What the live instance actually showed".
+Written 2026-09-22, after v0.3.0 shipped; updated the same day. Restart with dev-skills loaded (manual mode) and
+read this first.
+
+> **Status: development paused (2026-09-22).** The GATT failure was **distance** (resolved by the user moving the
+> proxy closer). Control is being taken to [safepay/hdpv_ble](https://github.com/safepay/hdpv_ble) instead of being
+> built here -- see "Decision: pause and use safepay/hdpv_ble". Do not start cover/write work in this repo.
 
 **Goal:** Home Assistant custom integration (HACS), domain `hacs_hunter_douglas_blind`, that reads everything a
 PowerView Gen 3 shade shares *without encryption* and exposes it as entities. Control (writes) is out of scope until
@@ -16,8 +20,9 @@ keystream onboarding exists.
 - **Installed on the user's live Home Assistant** (2026.9.3, HA OS, ESPHome Bluetooth proxy, one shade: Duette TDBU type 8,
   home 63548, address ending `0851`). Verified through the read-only HA MCP:
   - Working: position 100, secondary 6.25, type 8, capability `top_down_bottom_up` (matches the real shade).
-  - **Not working: the GATT reads.** Battery is `unavailable`, no firmware/hardware/serial (model falls back to
-    "PowerView Gen 3 type 8"). **Still unresolved** -- see below for what was and was not established.
+  - **GATT reads: resolved -- the cause was distance.** The user moved the ESP32 proxy closer to the shade and the
+    link came up -- the "move `btp-1` within 1-2 m" test from the old next-step list. Bonding (hypothesis 2 below)
+    is effectively dead, which matters because it would have blocked control from any proxy.
 - v0.2.0 added the **Refresh battery** button (per shade, diagnostic); it raises the reason a read failed.
 - v0.2.1 (diagnostics only, no fix): the first GATT connect failure per shade logs a WARNING (error, proxy details,
   RSSI, connectable-advert seen), the button message includes the error text, connect attempts capped at 3.
@@ -58,7 +63,7 @@ limits it instead.
 **Still standing:** address type (`address_type: 1` random, matches `C6:` static-random) is genuinely ruled out, and
 position/type/status come from passive adverts, so they say nothing about connectability.
 
-**Live hypotheses, none eliminated:**
+**Hypotheses as they stood before the distance fix (kept for the record):**
 
 1. Wi-Fi/BLE coexistence on the ESP32 -- one radio, and the connect handshake needs precise timing that scanning does not.
 2. The shade filters connections (accept list / bonding). The phone that enrolled the shades in the official PowerView
@@ -79,23 +84,33 @@ Track: none open (v0.3.0 SHIP done)    Mode: manual (say "auto mode" to change; 
 
 `.claude/` is gitignored session scratch (the release PRs force-added the gate file). This table is the durable copy.
 
+## Decision: pause and use safepay/hdpv_ble
+
+Researched 2026-09-22 before starting control work, to avoid reinventing it:
+
+| Repo | State | Notes |
+|---|---|---|
+| [patman15/hdpv_ble](https://github.com/patman15/hdpv_ble) | archived (Aug 2026) | original; README redirects to safepay |
+| [safepay/hdpv_ble](https://github.com/safepay/hdpv_ble) | active, Apache-2.0, v0.26.8 | full BLE control incl. **top/bottom rail covers for type 8 TDBU**, velocity, identify, battery, RSSI; home key in the config flow (Reconfigure-able); gateway key fetch; ESP32 + Linux shade emulators |
+| [milch PR #35](https://github.com/safepay/hdpv_ble/pull/35) | open | fixes the ESP32 emulator for current PowerView app versions (FF12 MAC response, phone region = UK during adoption) |
+
+safepay already decodes the same unencrypted adverts this integration does, and shows state for shades without a
+key, so this repo is a strict subset of it. Control here would repeat its work (frame layout, key entry, command
+queueing, shade-initiated disconnects). Its domain is `hunterdouglas_powerview_ble`, so both can be installed, but
+two integrations opening GATT to one shade through one proxy will contend -- remove this one once safepay works.
+
 ## Next step
 
-Nothing here needs code. The next move is to break the tie between the three hypotheses above, cheapest first:
-
-1. **Move `btp-1` to within 1-2 m of the shade** and press **Refresh battery**. Free. The shade has been read at -59 to
-   -76 dBm; if a strong link connects, it is the radio and the answer is placement or a better board. If it still fails
-   at ~-50 dBm, link quality is eliminated. Read `GATT status` on the shade's device page -- v0.3.0 puts the reason
-   there, so this no longer needs the log.
-2. **Try a device that has never run the official PowerView app** (a second phone or tablet, nRF Connect, next to the
-   shade). If it connects, the shade accepts strangers and hypothesis 2 is dead. If it fails the same way, the shade
-   only talks to enrolled centrals -- and no ESPHome proxy will ever qualify, because proxies cannot pair. While there,
-   note whether the advert is flagged CONNECTABLE and its interval; that settles hypothesis 3, and HA cannot see either.
-3. **USB Bluetooth dongle on the HA host** -- the definitive radio test, but note HA runs as a **KVM guest** on a
-   Proxmox host, so it needs USB passthrough into the VM first. If pairing turns out to be required (hypothesis 2),
-   a local adapter is the only thing that can do it: `establish_connection` takes `pair=True`.
-4. Optional while waiting: ESPHome scan-duty tuning (`esp32_ble_tracker: scan_parameters`). Low expected value.
-5. Once a read succeeds: confirm which Device Information characteristics exist (`2A29/24/25/26/27`).
+1. **Capture the home key with an ESP32-S3 shade emulator** -- milch's PR #35 branch
+   (`milch/hdpv_ble` `main` @ `b2a5738`, `emu/PV_BLE_cover`), Arduino IDE, esp32 core **3.0.7**, wolfSSL **5.7.6**,
+   phone region temporarily **United Kingdom**, adopt `myPVcover`, read `set shade key: \xNN...` from serial,
+   then delete `myPVcover` from the app. Full walkthrough: the PDF produced in this session (kept out of the repo).
+   The key controls every shade in the home: never commit it, paste it in an issue, or put it in chat.
+2. **Install safepay/hdpv_ble** via HACS custom repository and enter the key. Verify both TDBU rails move.
+3. **Remove this integration from HA**, then park the repo: README note pointing to safepay, archive on GitHub
+   (a work commit, no version bump -- only after steps 1-2 are confirmed).
+4. Optional upstream help: report the PR #35 hardware re-test result (the maintainer asked for exactly that), any
+   type 8 mapping issue, and the lesson that ESPHome proxy distance is what breaks GATT.
 
 Housekeeping: `Bluetooth Proxy-1` was deleted but its entities may still be in the registry -- removing that ESPHome
 config entry stops the stale `unavailable` entities and the reconnect noise.
