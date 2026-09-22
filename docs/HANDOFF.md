@@ -10,8 +10,8 @@ keystream onboarding exists.
 ## Current state
 
 - **v0.1.0, v0.2.0, v0.2.1 and v0.3.0 are released** (tags `v0.1.0` = `67169fa`, `v0.2.0` = `5e5cf0e`,
-  `v0.2.1` = `63fbd9c`, `v0.3.0` = this release's merge commit; GitHub releases, no assets). `main` is the default
-  branch and holds all of them. Repo: `darthrater78/hacs_hunter-douglas-blind`. HACS repo metadata
+  `v0.2.1` = `63fbd9c`, `v0.3.0` = `e796d3c`; GitHub releases, no assets). `main` is the default branch and holds
+  all of them. Repo: `darthrater78/hacs_hunter-douglas-blind`. HACS repo metadata
   (description, topics) and the icon are done; all three CI jobs (HACS, hassfest, pytest) are green.
 - **Installed on the user's live Home Assistant** (2026.9.3, HA OS, ESPHome Bluetooth proxy, one shade: Duette TDBU type 8,
   home 63548, address ending `0851`). Verified through the read-only HA MCP:
@@ -58,6 +58,24 @@ limits it instead.
 **Still standing:** address type (`address_type: 1` random, matches `C6:` static-random) is genuinely ruled out, and
 position/type/status come from passive adverts, so they say nothing about connectability.
 
+### What v0.3.0 showed within minutes of being installed (2026-09-21 22:53 local)
+
+`sensor.powerview_shade_0851_gatt_status`, on the shade's device page:
+
+```
+the connection failed (BleakAbortedError: C6:83:B4:47:08:51 - Failed to connect after 3 attempt(s):
+Error ESP_GATT_ERROR while connecting: Connection failed due to GATT operation erro)
+```
+
+RSSI at the time: **-62 dBm**. This is the first failure captured that is unambiguously the real one, and
+it narrows things:
+
+- It got **past the scanner-count guard**, so a connectable scanner was registered -- not the start-up race.
+- It **reached the radio** and failed after three real attempts -- not the LAN outage, not a stale advert.
+- It failed at a **strong link** (-62 dBm), which weakens but does not kill the link-quality explanation.
+
+Read this sensor rather than the log from now on; the button raises the same string.
+
 **Live hypotheses, none eliminated:**
 
 1. Wi-Fi/BLE coexistence on the ESP32 -- one radio, and the connect handshake needs precise timing that scanning does not.
@@ -71,8 +89,9 @@ position/type/status come from passive adverts, so they say nothing about connec
 ## Gate tracker
 
 ```
-Track: none open (v0.3.0 SHIP done)    Mode: manual (say "auto mode" to change; never assume it)
-🔢 VERSION ✅ 0.3.0   🔨 BUILD ✅   🔒 SECURITY ✅ 0 open   📄 DOCS ✅   📦 RELEASE ✅   🚀 SHIP ✅ v0.3.0
+Track: none open (v0.3.0 SHIP done 2026-09-22: tag e796d3c, release published, workflow success)
+Mode: manual (say "auto mode" to change; never assume it)
+🔢 VERSION ✅ 0.3.0   🔨 BUILD ✅ CI-only   🔒 SECURITY ✅ 0 open   📄 DOCS ✅   📦 RELEASE ✅ #11   🚀 SHIP ✅ v0.3.0
 🔕 waived 2026-09-21 by user: hacs/action@main + hassfest@master unpinned (first-party validators, read-only jobs).
    Re-opens if either gets write access or secrets.
 ```
@@ -83,10 +102,10 @@ Track: none open (v0.3.0 SHIP done)    Mode: manual (say "auto mode" to change; 
 
 Nothing here needs code. The next move is to break the tie between the three hypotheses above, cheapest first:
 
-1. **Move `btp-1` to within 1-2 m of the shade** and press **Refresh battery**. Free. The shade has been read at -59 to
-   -76 dBm; if a strong link connects, it is the radio and the answer is placement or a better board. If it still fails
-   at ~-50 dBm, link quality is eliminated. Read `GATT status` on the shade's device page -- v0.3.0 puts the reason
-   there, so this no longer needs the log.
+1. **Move `btp-1` to within 1-2 m of the shade** and press **Refresh battery**, then read `GATT status` on the
+   device page. The shade has been read at -59 to -76 dBm and **already fails at -62** (above), so this is really
+   asking whether ~-50 dBm behaves differently. If it still reports `ESP_GATT_ERROR` there, link quality is
+   eliminated and hypotheses 2 and 3 are what remain.
 2. **Try a device that has never run the official PowerView app** (a second phone or tablet, nRF Connect, next to the
    shade). If it connects, the shade accepts strangers and hypothesis 2 is dead. If it fails the same way, the shade
    only talks to enrolled centrals -- and no ESPHome proxy will ever qualify, because proxies cannot pair. While there,
