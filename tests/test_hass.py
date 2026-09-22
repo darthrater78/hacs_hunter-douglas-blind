@@ -289,7 +289,6 @@ async def test_refresh_button_says_why_when_no_battery(hass: HomeAssistant):
 async def test_gatt_status_reports_ok_after_a_successful_read(hass: HomeAssistant):
     entry, _cb = await _setup(hass, [make_info(CLOSED)])
     hub = entry.runtime_data
-    assert _state(hass, "gatt_status").state == "unknown"  # nothing tried yet
 
     async def connect(*_a, **_k):
         return _FakeClient()
@@ -343,6 +342,8 @@ async def test_watched_poll_gives_up_instead_of_queueing_forever(hass: HomeAssis
     hub = entry.runtime_data
     shade = hub.shades["C6:83:B4:47:08:51"]
 
+    before_attempt, before_error = shade.last_attempt, shade.last_error
+
     await hub._gatt_lock.acquire()
     try:
         failure = await hub.async_poll_gatt(shade, wait=0.01)
@@ -351,9 +352,10 @@ async def test_watched_poll_gives_up_instead_of_queueing_forever(hass: HomeAssis
 
     assert failure is not None
     assert "another shade is being read" in failure
-    # A queued-out poll never reached the radio, so it is not a read failure.
-    assert shade.last_attempt is None
-    assert shade.last_error is None
+    # A queued-out poll never reached the radio, so it is not a read failure:
+    # the recorded outcome is whatever the last real attempt left behind.
+    assert shade.last_attempt == before_attempt
+    assert shade.last_error == before_error
 
 
 async def test_retries_re_resolve_the_radio(hass: HomeAssistant):
@@ -373,8 +375,7 @@ async def test_retries_re_resolve_the_radio(hass: HomeAssistant):
         patch("custom_components.hacs_hunter_douglas_blind.hub.establish_connection", connect),
     ):
         await hub.async_poll_gatt(hub.shades["C6:83:B4:47:08:51"])
-
-    assert captured["ble_device_callback"]() is second
+        assert captured["ble_device_callback"]() is second
 
 
 async def test_retries_fall_back_to_the_known_device(hass: HomeAssistant):
@@ -394,8 +395,7 @@ async def test_retries_fall_back_to_the_known_device(hass: HomeAssistant):
         patch("custom_components.hacs_hunter_douglas_blind.hub.establish_connection", connect),
     ):
         await hub.async_poll_gatt(hub.shades["C6:83:B4:47:08:51"])
-
-    assert captured["ble_device_callback"]() is known
+        assert captured["ble_device_callback"]() is known
 
 
 async def test_gatt_status_strips_control_characters(hass: HomeAssistant):
@@ -445,3 +445,22 @@ async def test_background_poll_waits_its_turn(hass: HomeAssistant):
 
     await hass.async_block_till_done()
     assert _state(hass, "battery").state == "63"
+
+
+def test_gatt_status_is_unknown_before_any_attempt():
+    """The pure function, where "never tried" is actually reachable."""
+    from homeassistant.util import dt as dt_util
+
+    from custom_components.hacs_hunter_douglas_blind.hub import ShadeData
+    from custom_components.hacs_hunter_douglas_blind.protocol import parse_advertisement
+    from custom_components.hacs_hunter_douglas_blind.sensor import gatt_status
+
+    advert = parse_advertisement(bytes.fromhex(CLOSED))
+    shade = ShadeData(address="C6:83:B4:47:08:51", name="PowerView", advert=advert)
+    assert gatt_status(shade) is None
+
+    shade.last_attempt = dt_util.utcnow()
+    assert gatt_status(shade) == "ok"
+
+    shade.last_error = "the connection failed"
+    assert gatt_status(shade) == "the connection failed"
